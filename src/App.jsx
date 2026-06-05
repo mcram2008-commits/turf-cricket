@@ -31,6 +31,10 @@ const get24Hour = (timeObj) => {
 };
 
 const formatTime = (timeObj) => `${timeObj.hour}:${timeObj.minute} ${timeObj.ampm}`;
+const formatPhoneForWA = (phone) => {
+  const digits = phone.replace(/\D/g, '');
+  return digits.length === 10 ? `91${digits}` : digits;
+};
 
 const CustomTimePicker = ({ label, time, setTime }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -112,13 +116,25 @@ export default function App() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   
   const [bookingDate, setBookingDate] = useState(new Date().toISOString().split('T')[0]);
-  const [inTime, setInTime] = useState({ hour: '10', minute: '00', ampm: 'AM' });
-  const [outTime, setOutTime] = useState({ hour: '11', minute: '00', ampm: 'AM' });
+  const [selectedSlotId, setSelectedSlotId] = useState(null);
   const [bookingTeam, setBookingTeam] = useState('');
   const [bookingPhone, setBookingPhone] = useState('');
   const [bookingEmail, setBookingEmail] = useState('');
   const [bookingSuccess, setBookingSuccess] = useState(null);
   const [bookingError, setBookingError] = useState('');
+
+  const dailySlots = useMemo(() => {
+    const slots = [];
+    for (let i = 6; i <= 23; i++) {
+      const ampm = i >= 12 ? 'PM' : 'AM';
+      const hour12 = i > 12 ? i - 12 : (i === 0 ? 12 : i);
+      const nextI = i + 1;
+      const nextAmpm = nextI >= 12 && nextI < 24 ? 'PM' : 'AM';
+      const nextHour12 = nextI > 12 ? nextI - 12 : (nextI === 0 ? 12 : nextI);
+      slots.push({ id: i, in24: i, out24: nextI, label: `${hour12}:00 ${ampm} - ${nextHour12}:00 ${nextAmpm}`, inTimeStr: `${hour12}:00 ${ampm}`, outTimeStr: `${nextHour12}:00 ${nextAmpm}` });
+    }
+    return slots;
+  }, []);
 
   useEffect(() => {
     if (clientProfile && !bookingTeam) {
@@ -138,9 +154,7 @@ export default function App() {
   const [blockOutTime, setBlockOutTime] = useState({ hour: '12', minute: '00', ampm: 'PM' });
   const [blockReason, setBlockReason] = useState('Maintenance');
 
-  const inTime24 = get24Hour(inTime);
-  const outTime24 = get24Hour(outTime);
-  const duration = outTime24 - inTime24;
+
 
   // Handlers
   const handleEntrySubmit = (e) => {
@@ -155,20 +169,21 @@ export default function App() {
 
   const handleBookingSubmit = (e) => {
     e.preventDefault();
-    if (duration <= 0) return setBookingError('Out time must be later than In time.');
+    if (!selectedSlotId) return setBookingError('Please select a time slot.');
+
+    const slot = dailySlots.find(s => s.id === selectedSlotId);
 
     const isBookingOverlap = bookings.some(b => {
       if (b.bookingDate !== bookingDate || b.status === 'rejected') return false;
-      return inTime24 < b.outTime24 && outTime24 > b.inTime24;
+      return slot.in24 < b.outTime24 && slot.out24 > b.inTime24;
     });
 
     const isBlockedOverlap = blockedSlots.some(b => {
       if (b.date !== bookingDate) return false;
-      return inTime24 < b.out24 && outTime24 > b.in24;
+      return slot.in24 < b.out24 && slot.out24 > b.in24;
     });
 
-    if (isBookingOverlap) return setBookingError('This time slot overlaps with an existing booking. Please try another time.');
-    if (isBlockedOverlap) return setBookingError('This time slot is blocked by Admin (Maintenance/Leave). Please choose another time.');
+    if (isBookingOverlap || isBlockedOverlap) return setBookingError('This time slot is already booked or blocked.');
 
     const newBooking = {
       id: 'B' + String(bookings.length + 1).padStart(3, '0') + '-' + Math.floor(Math.random() * 1000),
@@ -177,10 +192,10 @@ export default function App() {
       userPhone: bookingPhone,
       userEmail: bookingEmail,
       bookingDate,
-      inTimeStr: formatTime(inTime),
-      outTimeStr: formatTime(outTime),
-      inTime24,
-      outTime24,
+      inTimeStr: slot.inTimeStr,
+      outTimeStr: slot.outTimeStr,
+      inTime24: slot.in24,
+      outTime24: slot.out24,
       status: 'pending',
       createdAt: new Date().toISOString()
     };
@@ -190,6 +205,10 @@ export default function App() {
     setBookingError('');
     setBookingPhone('');
     setBookingEmail('');
+    setSelectedSlotId(null);
+
+    const text = `New Turf Booking Request! ⚽\n\n*Name:* ${newBooking.userName}\n*Team:* ${newBooking.teamName}\n*Date:* ${newBooking.bookingDate}\n*Time:* ${newBooking.inTimeStr} - ${newBooking.outTimeStr}\n*Phone:* ${newBooking.userPhone}\n\nPlease check admin portal.`;
+    window.open(`https://wa.me/916379782142?text=${encodeURIComponent(text)}`, '_blank');
   };
 
   const handleAdminBlockSlot = (e) => {
@@ -212,7 +231,16 @@ export default function App() {
   };
 
   const handleUpdateBookingStatus = (id, newStatus) => {
-    setBookings(bookings.map(b => b.id === id ? { ...b, status: newStatus } : b));
+    setBookings(bookings.map(b => {
+      if (b.id === id) {
+        const statusText = newStatus === 'confirmed' ? 'APPROVED ✅' : 'REJECTED ❌';
+        let text = `Hello ${b.userName},\nYour turf booking for *${b.bookingDate}* at *${b.inTimeStr} - ${b.outTimeStr}* has been *${statusText}*.\n`;
+        if (newStatus === 'confirmed') text += `\nPlease visit the turf on time. Thank you!`;
+        window.open(`https://wa.me/${formatPhoneForWA(b.userPhone)}?text=${encodeURIComponent(text)}`, '_blank');
+        return { ...b, status: newStatus };
+      }
+      return b;
+    }));
   };
 
 
@@ -444,47 +472,53 @@ export default function App() {
       ) : (
         <main className="animate-fade main-client-view">
           
-          <div className="welcome-banner glass-panel">
-            <h2>Welcome, <span style={{ color: 'var(--primary)' }}>{clientProfile.name}</span>!</h2>
-            <p style={{color: 'var(--text-muted)', marginTop: '4px'}}>Representing <strong style={{color: 'white'}}>{clientProfile.team}</strong></p>
-          </div>
-
-          <div className="glass-panel turf-front-panel animate-slide">
-            <div className="front-image-wrapper">
-              <img src={TURF_INFO.image} alt="Turf View" className="front-turf-image" />
-            </div>
-            <div className="front-details">
-              <h2 className="front-title">{TURF_INFO.name}</h2>
-              <div className="front-address">
-                <MapPin size={20} className="address-icon"/>
-                <p>{TURF_INFO.location}</p>
+          {currentPath === '/' && (
+            <>
+              <div className="welcome-banner glass-panel">
+                <h2>Welcome, <span style={{ color: 'var(--primary)' }}>{clientProfile.name}</span>!</h2>
+                <p style={{color: 'var(--text-muted)', marginTop: '4px'}}>Representing <strong style={{color: 'white'}}>{clientProfile.team}</strong></p>
               </div>
 
-              <div className="front-facilities">
-                <h3>Facilities Available</h3>
-                <div className="facilities-grid">
-                  {TURF_INFO.amenities.map((item, idx) => (
-                    <div key={idx} className="facility-item">
-                      <div className="facility-icon">{item.icon}</div>
-                      <span>{item.name}</span>
+              <div className="glass-panel turf-front-panel animate-slide">
+                <div className="front-image-wrapper">
+                  <img src={TURF_INFO.image} alt="Turf View" className="front-turf-image" />
+                </div>
+                <div className="front-details">
+                  <h2 className="front-title">{TURF_INFO.name}</h2>
+                  <div className="front-address">
+                    <MapPin size={20} className="address-icon"/>
+                    <p>{TURF_INFO.location}</p>
+                  </div>
+
+                  <div className="front-facilities">
+                    <h3>Facilities Available</h3>
+                    <div className="facilities-grid">
+                      {TURF_INFO.amenities.map((item, idx) => (
+                        <div key={idx} className="facility-item">
+                          <div className="facility-icon">{item.icon}</div>
+                          <span>{item.name}</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  </div>
+
+                  <div className="front-action">
+                    <button className="btn-primary book-slot-btn" onClick={() => navigate('/book')}>
+                      Book a Slot <ArrowRight size={20} />
+                    </button>
+                  </div>
                 </div>
               </div>
+            </>
+          )}
 
-              <div className="front-action">
-                <button className="btn-primary book-slot-btn" onClick={() => document.getElementById('booking-section')?.scrollIntoView({ behavior: 'smooth' })}>
-                  Book a Slot <ArrowRight size={20} />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div id="booking-section" className="booking-top-section animate-slide" style={{ animationDelay: '0.1s' }}>
-            <div className="glass-panel booking-form-panel">
-              <h3 className="section-title" style={{ borderBottom: '1px solid var(--border)', paddingBottom: '12px', marginBottom: '20px' }}>
-                Request a Slot
-              </h3>
+          {currentPath === '/book' && (
+            <div id="booking-section" className="booking-top-section animate-slide" style={{ animationDelay: '0.1s' }}>
+              <div className="glass-panel booking-form-panel">
+                <div style={{display: 'flex', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--border)', paddingBottom: '12px'}}>
+                  <button className="btn-secondary" onClick={() => navigate('/')} style={{marginRight: '12px', padding: '6px 12px'}}>&larr; Back</button>
+                  <h3 className="section-title" style={{margin: 0, borderBottom: 'none', paddingBottom: 0}}>Book Your Slot</h3>
+                </div>
               
               {bookingSuccess ? (
                 <div className="success-message animate-scale" style={{ textAlign: 'left', width: '100%', maxWidth: '500px', margin: '0 auto' }}>
@@ -544,38 +578,69 @@ export default function App() {
                 <form onSubmit={handleBookingSubmit} className="booking-form">
                   {bookingError && <div className="error-banner"><Activity size={16}/> {bookingError}</div>}
                   
-                  <div className="form-group">
+                  <div className="form-group" style={{ marginBottom: '24px' }}>
                     <label><Calendar size={14} /> Select Date</label>
-                    <input type="date" value={bookingDate} onChange={(e) => setBookingDate(e.target.value)} min={new Date().toISOString().split('T')[0]} required style={{ maxWidth: '300px' }} />
+                    <input type="date" value={bookingDate} onChange={(e) => { setBookingDate(e.target.value); setSelectedSlotId(null); }} min={new Date().toISOString().split('T')[0]} required style={{ maxWidth: '300px', width: '100%' }} />
                   </div>
 
-                  <div className="time-row" style={{ marginTop: '20px' }}>
-                    <CustomTimePicker label="In Time (AM / PM)" time={inTime} setTime={setInTime} />
-                    <CustomTimePicker label="Out Time (AM / PM)" time={outTime} setTime={setOutTime} />
+                  <div className="slots-container" style={{ marginBottom: '24px' }}>
+                    <label style={{ display: 'block', marginBottom: '10px' }}><Clock size={14} /> Available Slots for {bookingDate}</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '10px' }}>
+                      {dailySlots.map(slot => {
+                        const isBooked = bookings.some(b => b.bookingDate === bookingDate && b.status !== 'rejected' && slot.in24 < b.outTime24 && slot.out24 > b.inTime24);
+                        const isBlocked = blockedSlots.some(b => b.date === bookingDate && slot.in24 < b.out24 && slot.out24 > b.in24);
+                        const isUnavailable = isBooked || isBlocked;
+                        const isSelected = selectedSlotId === slot.id;
+                        
+                        let slotClass = "btn-secondary";
+                        let statusText = "";
+                        if (isUnavailable) {
+                           slotClass = "btn-secondary disabled";
+                           statusText = isBooked ? "(Booked)" : "(Blocked)";
+                        } else if (isSelected) {
+                           slotClass = "btn-primary";
+                        }
+                        return (
+                          <button 
+                            key={slot.id} type="button" 
+                            className={slotClass} 
+                            disabled={isUnavailable}
+                            onClick={() => setSelectedSlotId(slot.id)}
+                            style={{ padding: '10px', fontSize: '13px', display: 'flex', flexDirection: 'column', alignItems: 'center', opacity: isUnavailable ? 0.5 : 1, cursor: isUnavailable ? 'not-allowed' : 'pointer' }}
+                          >
+                            <span>{slot.label}</span>
+                            {statusText && <span style={{ fontSize: '11px', marginTop: '4px' }}>{statusText}</span>}
+                          </button>
+                        )
+                      })}
+                    </div>
                   </div>
 
-                  <div className="form-group" style={{ marginTop: '16px', maxWidth: '400px' }}>
-                    <label><Users size={14} /> Team Name</label>
-                    <input type="text" placeholder="Enter Team Name" value={bookingTeam} onChange={(e) => setBookingTeam(e.target.value)} required />
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
+                    <div className="form-group" style={{ flex: '1 1 200px' }}>
+                      <label><Users size={14} /> Team Name</label>
+                      <input type="text" placeholder="Enter Team Name" value={bookingTeam} onChange={(e) => setBookingTeam(e.target.value)} required />
+                    </div>
+
+                    <div className="form-group" style={{ flex: '1 1 200px' }}>
+                      <label><Phone size={14} /> Phone Number</label>
+                      <input type="tel" placeholder="Enter phone number" value={bookingPhone} onChange={(e) => setBookingPhone(e.target.value)} required />
+                    </div>
+
+                    <div className="form-group" style={{ flex: '1 1 200px' }}>
+                      <label><FileText size={14} /> Email Address</label>
+                      <input type="email" placeholder="Enter email address" value={bookingEmail} onChange={(e) => setBookingEmail(e.target.value)} required />
+                    </div>
                   </div>
 
-                  <div className="form-group" style={{ marginTop: '16px', maxWidth: '400px' }}>
-                    <label><Phone size={14} /> Phone Number</label>
-                    <input type="tel" placeholder="Enter phone number" value={bookingPhone} onChange={(e) => setBookingPhone(e.target.value)} required />
-                  </div>
-
-                  <div className="form-group" style={{ marginTop: '16px', maxWidth: '400px' }}>
-                    <label><FileText size={14} /> Email Address</label>
-                    <input type="email" placeholder="Enter email address" value={bookingEmail} onChange={(e) => setBookingEmail(e.target.value)} required />
-                  </div>
-
-                  <button type="submit" className="btn-primary" style={{marginTop: '20px', padding: '14px 40px', fontSize: '16px'}}>
+                  <button type="submit" className="btn-primary" style={{marginTop: '24px', padding: '14px 40px', fontSize: '16px', width: '100%'}}>
                     Request Booking Slot
                   </button>
                 </form>
               )}
             </div>
           </div>
+          )}
         </main>
       )}
 
