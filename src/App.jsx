@@ -110,14 +110,13 @@ export default function App() {
   const [entryName, setEntryName] = useState('');
   const [entryTeam, setEntryTeam] = useState('');
   const [showProfileModal, setShowProfileModal] = useState(false);
-  const [billBooking, setBillBooking] = useState(null); // Tracks which booking to show the bill for
   
   const [bookingDate, setBookingDate] = useState(new Date().toISOString().split('T')[0]);
   const [inTime, setInTime] = useState({ hour: '10', minute: '00', ampm: 'AM' });
   const [outTime, setOutTime] = useState({ hour: '11', minute: '00', ampm: 'AM' });
   const [bookingTeam, setBookingTeam] = useState('');
   const [bookingPhone, setBookingPhone] = useState('');
-  const [bookingSecondaryPhone, setBookingSecondaryPhone] = useState('');
+  const [bookingEmail, setBookingEmail] = useState('');
   const [bookingSuccess, setBookingSuccess] = useState(null);
   const [bookingError, setBookingError] = useState('');
 
@@ -142,9 +141,6 @@ export default function App() {
   const inTime24 = get24Hour(inTime);
   const outTime24 = get24Hour(outTime);
   const duration = outTime24 - inTime24;
-  const isWeekend = new Date(bookingDate).getDay() === 0 || new Date(bookingDate).getDay() === 6;
-  const currentRate = isWeekend ? 800 : 600;
-  const totalPrice = duration > 0 ? duration * currentRate : 0;
 
   // Handlers
   const handleEntrySubmit = (e) => {
@@ -179,16 +175,13 @@ export default function App() {
       userName: clientProfile.name,
       teamName: bookingTeam,
       userPhone: bookingPhone,
-      secondaryPhone: bookingSecondaryPhone,
+      userEmail: bookingEmail,
       bookingDate,
       inTimeStr: formatTime(inTime),
       outTimeStr: formatTime(outTime),
       inTime24,
       outTime24,
-      totalPrice,
       status: 'pending',
-      paymentStatus: 'pending', // pending, completed
-      paymentMethod: null, // online, offline
       createdAt: new Date().toISOString()
     };
 
@@ -196,7 +189,7 @@ export default function App() {
     setBookingSuccess(newBooking);
     setBookingError('');
     setBookingPhone('');
-    setBookingSecondaryPhone('');
+    setBookingEmail('');
   };
 
   const handleAdminBlockSlot = (e) => {
@@ -222,14 +215,6 @@ export default function App() {
     setBookings(bookings.map(b => b.id === id ? { ...b, status: newStatus } : b));
   };
 
-  // Payment Handlers
-  const handlePaymentSelection = (id, method) => {
-    setBookings(bookings.map(b => b.id === id ? { ...b, paymentMethod: method, paymentStatus: method === 'offline' ? 'completed' : 'pending' } : b));
-  };
-
-  const handleOnlinePaymentComplete = (id) => {
-    setBookings(bookings.map(b => b.id === id ? { ...b, paymentStatus: 'completed' } : b));
-  };
 
   const myBookings = useMemo(() => {
     if (!clientProfile) return [];
@@ -237,10 +222,8 @@ export default function App() {
   }, [bookings, clientProfile]);
 
   const stats = useMemo(() => {
-    const confirmed = bookings.filter(b => b.status === 'confirmed');
     return {
-      totalBookings: bookings.length,
-      totalRevenue: confirmed.reduce((acc, b) => acc + b.totalPrice, 0)
+      totalBookings: bookings.length
     };
   }, [bookings]);
 
@@ -318,13 +301,6 @@ export default function App() {
                     <div className="metrics-grid">
                       <div className="metric-card glass-panel">
                         <div className="metric-data">
-                          <p>Total Revenue</p>
-                          <h3>₹{stats.totalRevenue}</h3>
-                        </div>
-                        <div className="metric-icon green"><DollarSign size={24} /></div>
-                      </div>
-                      <div className="metric-card glass-panel">
-                        <div className="metric-data">
                           <p>Total Bookings</p>
                           <h3>{stats.totalBookings}</h3>
                         </div>
@@ -348,7 +324,7 @@ export default function App() {
                                 <h4>{booking.teamName} <span style={{fontSize:'12px', color:'var(--text-muted)', fontWeight:'normal'}}>(Req by: {booking.userName})</span></h4>
                                 <p style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)' }}>
                                   <Phone size={12}/> {booking.userPhone}
-                                  {booking.secondaryPhone && <span style={{fontSize: '12px', marginLeft: '4px'}}> | Alt: {booking.secondaryPhone}</span>}
+                                  <span style={{fontSize: '12px', marginLeft: '4px'}}> | Email: {booking.userEmail}</span>
                                 </p>
                                 <p style={{marginTop: '6px', color: 'var(--text-bright)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                   <Calendar size={14}/> {booking.bookingDate} <span style={{ margin: '0 4px', color: 'var(--text-muted)' }}>|</span> <Clock size={14}/> {booking.inTimeStr} - {booking.outTimeStr}
@@ -356,9 +332,6 @@ export default function App() {
                               </div>
                             </div>
                             <div className="booking-status-actions">
-                              <div style={{ textAlign: 'right', minWidth: '80px' }}>
-                                <p style={{ fontSize: '18px', fontWeight: '700', color: 'var(--primary)' }}>₹{booking.totalPrice}</p>
-                              </div>
                               {booking.status === 'confirmed' && <span className="badge badge-green">Accepted</span>}
                               {booking.status === 'pending' && <span className="badge badge-yellow">Pending</span>}
                               {booking.status === 'rejected' && <span className="badge badge-red">Rejected</span>}
@@ -547,15 +520,9 @@ export default function App() {
                       <span style={{ color: 'var(--text-muted)' }}>Phone Number</span>
                       <strong style={{ color: 'var(--text-bright)' }}>{bookingSuccess.userPhone}</strong>
                     </div>
-                    {bookingSuccess.secondaryPhone && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '14px', fontSize: '14px' }}>
-                        <span style={{ color: 'var(--text-muted)' }}>Secondary Phone</span>
-                        <strong style={{ color: 'var(--text-bright)' }}>{bookingSuccess.secondaryPhone}</strong>
-                      </div>
-                    )}
-                    <div style={{ borderTop: '1px dashed var(--border)', margin: '16px 0', paddingTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ color: 'var(--text-muted)', fontWeight: '600' }}>Estimated Price</span>
-                      <strong style={{ fontSize: '20px', color: 'var(--primary)', fontWeight: '800' }}>₹{bookingSuccess.totalPrice}</strong>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '14px', fontSize: '14px' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>Email Address</span>
+                      <strong style={{ color: 'var(--text-bright)' }}>{bookingSuccess.userEmail}</strong>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'center', marginTop: '12px' }}>
                       <span className="badge badge-yellow animate-pulse" style={{ fontSize: '13px', padding: '6px 16px', borderRadius: '30px' }}>
@@ -587,33 +554,19 @@ export default function App() {
                     <CustomTimePicker label="Out Time (AM / PM)" time={outTime} setTime={setOutTime} />
                   </div>
 
-                  {duration > 0 && (
-                    <div className="price-summary">
-                      <div className="price-row">
-                        <span>Duration:</span> <strong>{duration.toFixed(1)} Hours</strong>
-                      </div>
-                      <div className="price-row">
-                        <span>Current Rate ({isWeekend ? 'Weekend' : 'Weekday'}):</span> <strong>₹{currentRate} / hr</strong>
-                      </div>
-                      <div className="price-row total-row">
-                        <span>Total Price:</span> <strong>₹{totalPrice.toFixed(2)}</strong>
-                      </div>
-                    </div>
-                  )}
-
                   <div className="form-group" style={{ marginTop: '16px', maxWidth: '400px' }}>
                     <label><Users size={14} /> Team Name</label>
                     <input type="text" placeholder="Enter Team Name" value={bookingTeam} onChange={(e) => setBookingTeam(e.target.value)} required />
                   </div>
 
                   <div className="form-group" style={{ marginTop: '16px', maxWidth: '400px' }}>
-                    <label><Phone size={14} /> Primary Phone Number</label>
-                    <input type="tel" placeholder="Enter primary phone number" value={bookingPhone} onChange={(e) => setBookingPhone(e.target.value)} required />
+                    <label><Phone size={14} /> Phone Number</label>
+                    <input type="tel" placeholder="Enter phone number" value={bookingPhone} onChange={(e) => setBookingPhone(e.target.value)} required />
                   </div>
 
                   <div className="form-group" style={{ marginTop: '16px', maxWidth: '400px' }}>
-                    <label><Phone size={14} /> Secondary Phone Number (Optional)</label>
-                    <input type="tel" placeholder="Enter secondary phone number" value={bookingSecondaryPhone} onChange={(e) => setBookingSecondaryPhone(e.target.value)} />
+                    <label><FileText size={14} /> Email Address</label>
+                    <input type="email" placeholder="Enter email address" value={bookingEmail} onChange={(e) => setBookingEmail(e.target.value)} required />
                   </div>
 
                   <button type="submit" className="btn-primary" style={{marginTop: '20px', padding: '14px 40px', fontSize: '16px'}}>
@@ -626,48 +579,6 @@ export default function App() {
         </main>
       )}
 
-      {/* Bill Generating Modal */}
-      {billBooking && (
-        <div className="modal-overlay" style={{zIndex: 1000}}>
-          <div className="modal-content glass-panel animate-scale" style={{ maxWidth: '450px', width: '90%', padding: '40px' }}>
-            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-              <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: 'rgba(16, 185, 129, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-                <Check size={32} color="var(--primary)" />
-              </div>
-              <h2 style={{ fontSize: '24px', fontWeight: 'bold' }}>Payment Successful!</h2>
-              <p style={{ color: 'var(--text-muted)' }}>Here is your confirmed booking bill.</p>
-            </div>
-
-            <div style={{ background: 'var(--bg-dark)', padding: '20px', borderRadius: '12px', border: '1px dashed var(--border)', marginBottom: '24px' }}>
-              <h3 style={{ textAlign: 'center', marginBottom: '16px', color: 'var(--text-bright)' }}>{TURF_INFO.name}</h3>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '14px' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Bill ID:</span>
-                <strong>{billBooking.id}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '14px' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Name / Team:</span>
-                <strong>{billBooking.userName} ({billBooking.teamName})</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '14px' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Date & Time:</span>
-                <strong>{billBooking.bookingDate} | {billBooking.inTimeStr} - {billBooking.outTimeStr}</strong>
-              </div>
-              <div style={{ borderTop: '1px solid var(--border)', margin: '16px 0' }}></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px', fontWeight: 'bold', color: 'var(--primary)' }}>
-                <span>Total Amount Paid:</span>
-                <span>₹{billBooking.totalPrice}</span>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button className="btn-secondary" style={{ flex: 1, padding: '12px' }} onClick={() => setBillBooking(null)}>Close</button>
-              <button className="btn-primary" style={{ flex: 1, padding: '12px', display: 'flex', justifyContent: 'center', gap: '8px' }} onClick={() => { alert('Bill downloaded!'); setBillBooking(null); }}>
-                <Download size={18} /> Download
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Profile History Modal */}
       {showProfileModal && (
@@ -699,50 +610,11 @@ export default function App() {
                         <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '8px' }}>Req ID: {b.id} | Team: {b.teamName}</p>
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <p style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--text-bright)', marginBottom: '8px' }}>₹{b.totalPrice}</p>
                         {b.status === 'pending' && <span className="badge badge-yellow animate-pulse">Pending Admin Approval</span>}
-                        {b.status === 'confirmed' && b.paymentStatus === 'completed' && <span className="badge badge-green">Slot Confirmed & Booked!</span>}
+                        {b.status === 'confirmed' && <span className="badge badge-green">Slot Confirmed & Booked!</span>}
                         {b.status === 'rejected' && <span className="badge badge-red">Rejected</span>}
                       </div>
                     </div>
-
-                    {/* Payment Action Section (Shown only if Admin Approved but payment is pending) */}
-                    {b.status === 'confirmed' && b.paymentStatus === 'pending' && (
-                      <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px dashed var(--border)' }}>
-                        {!b.paymentMethod ? (
-                          <div>
-                            <p style={{ color: 'var(--accent-blue)', marginBottom: '12px', fontWeight: '600' }}>Admin Approved! Choose Payment Method to Confirm Booking:</p>
-                            <div style={{ display: 'flex', gap: '12px' }}>
-                              <button className="btn-secondary" onClick={() => handlePaymentSelection(b.id, 'offline')}>
-                                Pay Offline (At Turf)
-                              </button>
-                              <button className="btn-primary" onClick={() => handlePaymentSelection(b.id, 'online')}>
-                                Pay Online (UPI QR)
-                              </button>
-                            </div>
-                          </div>
-                        ) : b.paymentMethod === 'online' && b.paymentStatus === 'pending' ? (
-                          <div style={{ background: 'var(--bg-dark)', padding: '20px', borderRadius: '8px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <p style={{ marginBottom: '16px', fontWeight: 'bold' }}>Scan QR Code to Pay ₹{b.totalPrice}</p>
-                            {/* Generic QR placeholder image generated by API */}
-                            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=turf@ybl&pn=Turf&am=${b.totalPrice}`} alt="QR Code" style={{ width: '200px', height: '200px', borderRadius: '8px', border: '4px solid white', background: 'white' }} />
-                            <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
-                              <button className="btn-secondary" onClick={() => handlePaymentSelection(b.id, null)}>Cancel</button>
-                              <button className="btn-primary" onClick={() => { handleOnlinePaymentComplete(b.id); setBillBooking(b); }}>I have Paid</button>
-                            </div>
-                          </div>
-                        ) : null}
-                      </div>
-                    )}
-
-                    {/* View Bill Button (Shown if Online payment completed) */}
-                    {b.status === 'confirmed' && b.paymentStatus === 'completed' && b.paymentMethod === 'online' && (
-                      <div style={{ marginTop: '16px', textAlign: 'right' }}>
-                        <button className="btn-secondary" style={{ padding: '8px 16px', fontSize: '13px' }} onClick={() => setBillBooking(b)}>
-                          <FileText size={14} style={{ display: 'inline', marginRight: '6px' }}/> View Bill
-                        </button>
-                      </div>
-                    )}
                     
                   </div>
                 ))}
