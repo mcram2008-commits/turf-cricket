@@ -116,25 +116,17 @@ export default function App() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   
   const [bookingDate, setBookingDate] = useState(new Date().toISOString().split('T')[0]);
-  const [selectedSlotId, setSelectedSlotId] = useState(null);
+  const [inTime, setInTime] = useState({ hour: '10', minute: '00', ampm: 'AM' });
+  const [outTime, setOutTime] = useState({ hour: '11', minute: '00', ampm: 'AM' });
   const [bookingTeam, setBookingTeam] = useState('');
   const [bookingPhone, setBookingPhone] = useState('');
   const [bookingEmail, setBookingEmail] = useState('');
   const [bookingSuccess, setBookingSuccess] = useState(null);
   const [bookingError, setBookingError] = useState('');
 
-  const dailySlots = useMemo(() => {
-    const slots = [];
-    for (let i = 6; i <= 23; i++) {
-      const ampm = i >= 12 ? 'PM' : 'AM';
-      const hour12 = i > 12 ? i - 12 : (i === 0 ? 12 : i);
-      const nextI = i + 1;
-      const nextAmpm = nextI >= 12 && nextI < 24 ? 'PM' : 'AM';
-      const nextHour12 = nextI > 12 ? nextI - 12 : (nextI === 0 ? 12 : nextI);
-      slots.push({ id: i, in24: i, out24: nextI, label: `${hour12}:00 ${ampm} - ${nextHour12}:00 ${nextAmpm}`, inTimeStr: `${hour12}:00 ${ampm}`, outTimeStr: `${nextHour12}:00 ${nextAmpm}` });
-    }
-    return slots;
-  }, []);
+  const inTime24 = get24Hour(inTime);
+  const outTime24 = get24Hour(outTime);
+  const duration = outTime24 - inTime24;
 
   useEffect(() => {
     if (clientProfile && !bookingTeam) {
@@ -169,21 +161,20 @@ export default function App() {
 
   const handleBookingSubmit = (e) => {
     e.preventDefault();
-    if (!selectedSlotId) return setBookingError('Please select a time slot.');
-
-    const slot = dailySlots.find(s => s.id === selectedSlotId);
+    if (duration <= 0) return setBookingError('Out time must be later than In time.');
 
     const isBookingOverlap = bookings.some(b => {
       if (b.bookingDate !== bookingDate || b.status === 'rejected') return false;
-      return slot.in24 < b.outTime24 && slot.out24 > b.inTime24;
+      return inTime24 < b.outTime24 && outTime24 > b.inTime24;
     });
 
     const isBlockedOverlap = blockedSlots.some(b => {
       if (b.date !== bookingDate) return false;
-      return slot.in24 < b.out24 && slot.out24 > b.in24;
+      return inTime24 < b.out24 && outTime24 > b.in24;
     });
 
-    if (isBookingOverlap || isBlockedOverlap) return setBookingError('This time slot is already booked or blocked.');
+    if (isBookingOverlap) return setBookingError('This time slot overlaps with an existing booking. Please try another time.');
+    if (isBlockedOverlap) return setBookingError('This time slot is blocked by Admin (Maintenance/Leave). Please choose another time.');
 
     const newBooking = {
       id: 'B' + String(bookings.length + 1).padStart(3, '0') + '-' + Math.floor(Math.random() * 1000),
@@ -192,10 +183,10 @@ export default function App() {
       userPhone: bookingPhone,
       userEmail: bookingEmail,
       bookingDate,
-      inTimeStr: slot.inTimeStr,
-      outTimeStr: slot.outTimeStr,
-      inTime24: slot.in24,
-      outTime24: slot.out24,
+      inTimeStr: formatTime(inTime),
+      outTimeStr: formatTime(outTime),
+      inTime24,
+      outTime24,
       status: 'pending',
       createdAt: new Date().toISOString()
     };
@@ -205,7 +196,6 @@ export default function App() {
     setBookingError('');
     setBookingPhone('');
     setBookingEmail('');
-    setSelectedSlotId(null);
 
     const text = `New Turf Booking Request! ⚽\n\n*Name:* ${newBooking.userName}\n*Team:* ${newBooking.teamName}\n*Date:* ${newBooking.bookingDate}\n*Time:* ${newBooking.inTimeStr} - ${newBooking.outTimeStr}\n*Phone:* ${newBooking.userPhone}\n\nPlease check admin portal.`;
     window.open(`https://wa.me/916379782142?text=${encodeURIComponent(text)}`, '_blank');
@@ -580,40 +570,31 @@ export default function App() {
                   
                   <div className="form-group" style={{ marginBottom: '24px' }}>
                     <label><Calendar size={14} /> Select Date</label>
-                    <input type="date" value={bookingDate} onChange={(e) => { setBookingDate(e.target.value); setSelectedSlotId(null); }} min={new Date().toISOString().split('T')[0]} required style={{ maxWidth: '300px', width: '100%' }} />
+                    <input type="date" value={bookingDate} onChange={(e) => setBookingDate(e.target.value)} min={new Date().toISOString().split('T')[0]} required style={{ maxWidth: '300px', width: '100%' }} />
                   </div>
 
-                  <div className="slots-container" style={{ marginBottom: '24px' }}>
-                    <label style={{ display: 'block', marginBottom: '10px' }}><Clock size={14} /> Available Slots for {bookingDate}</label>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '10px' }}>
-                      {dailySlots.map(slot => {
-                        const isBooked = bookings.some(b => b.bookingDate === bookingDate && b.status !== 'rejected' && slot.in24 < b.outTime24 && slot.out24 > b.inTime24);
-                        const isBlocked = blockedSlots.some(b => b.date === bookingDate && slot.in24 < b.out24 && slot.out24 > b.in24);
-                        const isUnavailable = isBooked || isBlocked;
-                        const isSelected = selectedSlotId === slot.id;
-                        
-                        let slotClass = "btn-secondary";
-                        let statusText = "";
-                        if (isUnavailable) {
-                           slotClass = "btn-secondary disabled";
-                           statusText = isBooked ? "(Booked)" : "(Blocked)";
-                        } else if (isSelected) {
-                           slotClass = "btn-primary";
-                        }
-                        return (
-                          <button 
-                            key={slot.id} type="button" 
-                            className={slotClass} 
-                            disabled={isUnavailable}
-                            onClick={() => setSelectedSlotId(slot.id)}
-                            style={{ padding: '10px', fontSize: '13px', display: 'flex', flexDirection: 'column', alignItems: 'center', opacity: isUnavailable ? 0.5 : 1, cursor: isUnavailable ? 'not-allowed' : 'pointer' }}
-                          >
-                            <span>{slot.label}</span>
-                            {statusText && <span style={{ fontSize: '11px', marginTop: '4px' }}>{statusText}</span>}
-                          </button>
-                        )
-                      })}
-                    </div>
+                  <div style={{ marginBottom: '24px' }}>
+                    <h4 style={{ marginBottom: '10px', fontSize: '14px', color: 'var(--text-bright)' }}>Bookings on {bookingDate}</h4>
+                    {bookings.filter(b => b.bookingDate === bookingDate && b.status !== 'rejected').length === 0 ? (
+                      <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>No bookings yet for this date. All timings available!</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {bookings.filter(b => b.bookingDate === bookingDate && b.status !== 'rejected').map(b => (
+                          <div key={b.id} style={{ padding: '10px 14px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', borderLeft: '3px solid ' + (b.status === 'confirmed' ? 'var(--accent-green)' : 'var(--accent-yellow)'), display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                              <strong style={{ display: 'block', fontSize: '14px', color: 'var(--primary)' }}>{b.inTimeStr} - {b.outTimeStr}</strong>
+                              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{b.teamName} (by {b.userName})</span>
+                            </div>
+                            <span style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '12px', background: 'rgba(255,255,255,0.1)' }}>{b.status === 'confirmed' ? 'Booked' : 'Pending'}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="time-row" style={{ marginTop: '20px', marginBottom: '24px' }}>
+                    <CustomTimePicker label="In Time (AM / PM)" time={inTime} setTime={setInTime} />
+                    <CustomTimePicker label="Out Time (AM / PM)" time={outTime} setTime={setOutTime} />
                   </div>
 
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
