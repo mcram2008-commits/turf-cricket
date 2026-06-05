@@ -573,25 +573,6 @@ export default function App() {
                     <input type="date" value={bookingDate} onChange={(e) => setBookingDate(e.target.value)} min={new Date().toISOString().split('T')[0]} required style={{ maxWidth: '300px', width: '100%' }} />
                   </div>
 
-                  <div style={{ marginBottom: '24px' }}>
-                    <h4 style={{ marginBottom: '10px', fontSize: '14px', color: 'var(--text-bright)' }}>Bookings on {bookingDate}</h4>
-                    {bookings.filter(b => b.bookingDate === bookingDate && b.status !== 'rejected').length === 0 ? (
-                      <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>No bookings yet for this date. All timings available!</p>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {bookings.filter(b => b.bookingDate === bookingDate && b.status !== 'rejected').map(b => (
-                          <div key={b.id} style={{ padding: '10px 14px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', borderLeft: '3px solid ' + (b.status === 'confirmed' ? 'var(--accent-green)' : 'var(--accent-yellow)'), display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div>
-                              <strong style={{ display: 'block', fontSize: '14px', color: 'var(--primary)' }}>{b.inTimeStr} - {b.outTimeStr}</strong>
-                              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{b.teamName} (by {b.userName})</span>
-                            </div>
-                            <span style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '12px', background: 'rgba(255,255,255,0.1)' }}>{b.status === 'confirmed' ? 'Booked' : 'Pending'}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
                   <div className="time-row" style={{ marginTop: '20px', marginBottom: '24px' }}>
                     <CustomTimePicker label="In Time (AM / PM)" time={inTime} setTime={setInTime} />
                     <CustomTimePicker label="Out Time (AM / PM)" time={outTime} setTime={setOutTime} />
