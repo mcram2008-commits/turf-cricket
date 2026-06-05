@@ -499,6 +499,43 @@ export default function App() {
                   </div>
                 </div>
               </div>
+
+              <div className="recent-bookings-section animate-slide" style={{ marginTop: '30px', animationDelay: '0.2s' }}>
+                <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', borderBottom: '1px solid var(--border)', paddingBottom: '12px' }}>
+                  <Calendar size={22} color="var(--primary)" /> 
+                  Upcoming & Recent Matches
+                </h3>
+                {bookings.filter(b => b.status !== 'rejected').length === 0 ? (
+                   <div className="glass-panel" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                     <Activity size={32} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
+                     <p>No matches scheduled yet.</p>
+                   </div>
+                ) : (
+                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+                     {bookings.filter(b => b.status !== 'rejected').map(b => (
+                        <div key={b.id} className="glass-panel" style={{ padding: '16px', borderLeft: '4px solid ' + (b.status === 'confirmed' ? 'var(--accent-green)' : 'var(--accent-yellow)'), display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                             <h4 style={{ fontSize: '18px', color: 'var(--text-bright)', margin: 0 }}>{b.teamName}</h4>
+                             <span className={`badge ${b.status === 'confirmed' ? 'badge-green' : 'badge-yellow'}`} style={{ fontSize: '11px', padding: '4px 8px' }}>
+                                {b.status === 'confirmed' ? 'Confirmed' : 'Pending'}
+                             </span>
+                           </div>
+                           <p style={{ fontSize: '14px', color: 'var(--text-muted)', margin: 0 }}>
+                             <User size={14} style={{ display: 'inline', verticalAlign: 'text-bottom', marginRight: '4px' }}/> By {b.userName}
+                           </p>
+                           <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
+                             <span style={{ fontSize: '13px', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '4px' }}>
+                               <Calendar size={13}/> {b.bookingDate}
+                             </span>
+                             <span style={{ fontSize: '13px', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '4px' }}>
+                               <Clock size={13}/> {b.inTimeStr} - {b.outTimeStr}
+                             </span>
+                           </div>
+                        </div>
+                     ))}
+                   </div>
+                )}
+              </div>
             </>
           )}
 
