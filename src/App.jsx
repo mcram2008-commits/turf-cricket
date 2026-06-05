@@ -93,14 +93,17 @@ export default function App() {
   useEffect(() => { localStorage.setItem('turf_bookings', JSON.stringify(bookings)); }, [bookings]);
   useEffect(() => { localStorage.setItem('turf_blocked', JSON.stringify(blockedSlots)); }, [blockedSlots]);
 
-  // 2. Hash Routing
-  const [currentPath, setCurrentPath] = useState(window.location.hash || '#/');
+  // 2. Path Routing
+  const [currentPath, setCurrentPath] = useState(window.location.pathname || '/');
   useEffect(() => {
-    const handleLocationChange = () => setCurrentPath(window.location.hash || '#/');
-    window.addEventListener('hashchange', handleLocationChange);
-    return () => window.removeEventListener('hashchange', handleLocationChange);
+    const handleLocationChange = () => setCurrentPath(window.location.pathname || '/');
+    window.addEventListener('popstate', handleLocationChange);
+    return () => window.removeEventListener('popstate', handleLocationChange);
   }, []);
-  const navigate = (path) => { window.location.hash = path; };
+  const navigate = (path) => {
+    window.history.pushState({}, '', path);
+    setCurrentPath(path);
+  };
 
   // 3. Client State
   const [clientProfile, setClientProfile] = useState(() => JSON.parse(sessionStorage.getItem('turf_client')) || null);
@@ -242,12 +245,12 @@ export default function App() {
   }, [bookings]);
 
   // View: Admin
-  if (currentPath === '#/admin') {
+  if (currentPath === '/admin') {
     return (
       <div className="app-container" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
         <header className="app-header">
           <div className="header-content">
-            <div className="logo-container" onClick={() => navigate('#/')} style={{cursor: 'pointer'}}>
+            <div className="logo-container" onClick={() => navigate('/')} style={{cursor: 'pointer'}}>
               <Trophy className="logo-icon" size={28} />
               <h1 className="logo-text">TURF TIME</h1>
             </div>
@@ -257,7 +260,7 @@ export default function App() {
                   <LogOut size={14} style={{display: 'inline', marginRight: '6px'}}/> Logout
                 </button>
               ) : (
-                <button onClick={() => navigate('#/')} className="btn-secondary" style={{padding: '8px 16px', fontSize: '13px'}}>
+                <button onClick={() => navigate('/')} className="btn-secondary" style={{padding: '8px 16px', fontSize: '13px'}}>
                   Back to Client Site
                 </button>
               )}
@@ -427,7 +430,7 @@ export default function App() {
 
       <header className="app-header">
         <div className="header-content">
-          <div className="logo-container" onClick={() => navigate('#/')} style={{cursor: 'pointer'}}>
+          <div className="logo-container" onClick={() => navigate('/')} style={{cursor: 'pointer'}}>
             <Trophy className="logo-icon animate-pulse" size={28} />
             <h1 className="logo-text">TURF TIME</h1>
           </div>
