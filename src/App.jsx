@@ -369,13 +369,17 @@ export default function App() {
             </div>
             <nav className="nav-links">
               <FirebaseStatusBadge />
-              {isAdminLoggedIn ? (
-                <button onClick={() => { setIsAdminLoggedIn(false); setAdminUsername(''); setAdminPassword(''); }} className="btn-secondary" style={{padding: '8px 16px', fontSize: '13px'}}>
-                  <LogOut size={14} style={{display: 'inline', marginRight: '6px'}}/> Logout
+              <div className="role-toggle">
+                <button className={`role-btn ${currentPath === '/' || currentPath === '/book' ? 'active' : ''}`} onClick={() => navigate('/')}>
+                  Player Site
                 </button>
-              ) : (
-                <button onClick={() => navigate('/')} className="btn-secondary" style={{padding: '8px 16px', fontSize: '13px'}}>
-                  Back to Client Site
+                <button className={`role-btn ${currentPath === '/admin' ? 'active' : ''}`} onClick={() => navigate('/admin')}>
+                  Admin Panel
+                </button>
+              </div>
+              {isAdminLoggedIn && (
+                <button onClick={() => { setIsAdminLoggedIn(false); setAdminUsername(''); setAdminPassword(''); }} className="btn-secondary" style={{padding: '8px 16px', fontSize: '13px', borderRadius: '20px'}}>
+                  <LogOut size={14} style={{display: 'inline', marginRight: '6px'}}/> Logout
                 </button>
               )}
             </nav>
@@ -552,6 +556,14 @@ export default function App() {
           </div>
           <nav className="nav-links">
             <FirebaseStatusBadge />
+            <div className="role-toggle">
+              <button className={`role-btn ${currentPath === '/' || currentPath === '/book' ? 'active' : ''}`} onClick={() => navigate('/')}>
+                Player Site
+              </button>
+              <button className={`role-btn ${currentPath === '/admin' ? 'active' : ''}`} onClick={() => navigate('/admin')}>
+                Admin Panel
+              </button>
+            </div>
             {clientProfile && (
               <button onClick={() => setShowProfileModal(true)} className="role-btn active" style={{marginRight: '12px'}}>
                 <History size={14} /> My History
