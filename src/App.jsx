@@ -5,6 +5,24 @@ import {
   CreditCard, Car, Bath, Shirt, X, History, ShieldAlert, AlertTriangle, FileText, Download, Package
 } from 'lucide-react';
 import './App.css';
+import { db, isFirebaseConfigured } from './firebase';
+import { collection, onSnapshot, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+
+const FirebaseStatusBadge = () => {
+  if (isFirebaseConfigured) {
+    return (
+      <span className="badge badge-green animate-fade" style={{ display: 'inline-flex', alignItems: 'center', fontSize: '12px', padding: '6px 12px' }}>
+        <span className="status-dot-active"></span> Realtime Cloud Sync
+      </span>
+    );
+  }
+  return (
+    <span className="badge badge-yellow animate-fade" title="Configure .env file to enable Firebase sync" style={{ display: 'inline-flex', alignItems: 'center', fontSize: '12px', padding: '6px 12px', cursor: 'help' }}>
+      <span className="status-dot-warning"></span> Local Offline Mode
+    </span>
+  );
+};
+
 
 const TURF_INFO = {
   name: 'Premium Green Arena',
@@ -82,20 +100,59 @@ export default function App() {
   const loadBookings = () => JSON.parse(localStorage.getItem('turf_bookings')) || [];
   const loadBlocked = () => JSON.parse(localStorage.getItem('turf_blocked')) || [];
 
-  const [bookings, setBookings] = useState(loadBookings());
-  const [blockedSlots, setBlockedSlots] = useState(loadBlocked());
+  const [bookings, setBookings] = useState(isFirebaseConfigured ? [] : loadBookings());
+  const [blockedSlots, setBlockedSlots] = useState(isFirebaseConfigured ? [] : loadBlocked());
 
   useEffect(() => {
-    const handleStorage = (e) => {
-      if (e.key === 'turf_bookings') setBookings(JSON.parse(e.newValue || '[]'));
-      if (e.key === 'turf_blocked') setBlockedSlots(JSON.parse(e.newValue || '[]'));
-    };
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
+    if (!isFirebaseConfigured) {
+      const handleStorage = (e) => {
+        if (e.key === 'turf_bookings') setBookings(JSON.parse(e.newValue || '[]'));
+        if (e.key === 'turf_blocked') setBlockedSlots(JSON.parse(e.newValue || '[]'));
+      };
+      window.addEventListener('storage', handleStorage);
+      return () => window.removeEventListener('storage', handleStorage);
+    } else {
+      const bookingsRef = collection(db, 'bookings');
+      const unsubscribeBookings = onSnapshot(bookingsRef, (snapshot) => {
+        const bookingsList = [];
+        snapshot.forEach((doc) => {
+          bookingsList.push({ id: doc.id, ...doc.data() });
+        });
+        bookingsList.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        setBookings(bookingsList);
+      }, (error) => {
+        console.error("Error fetching bookings from Firestore:", error);
+      });
+
+      const blockedRef = collection(db, 'blockedSlots');
+      const unsubscribeBlocked = onSnapshot(blockedRef, (snapshot) => {
+        const blockedList = [];
+        snapshot.forEach((doc) => {
+          blockedList.push({ id: doc.id, ...doc.data() });
+        });
+        setBlockedSlots(blockedList);
+      }, (error) => {
+        console.error("Error fetching blocked slots from Firestore:", error);
+      });
+
+      return () => {
+        unsubscribeBookings();
+        unsubscribeBlocked();
+      };
+    }
   }, []);
 
-  useEffect(() => { localStorage.setItem('turf_bookings', JSON.stringify(bookings)); }, [bookings]);
-  useEffect(() => { localStorage.setItem('turf_blocked', JSON.stringify(blockedSlots)); }, [blockedSlots]);
+  useEffect(() => {
+    if (!isFirebaseConfigured) {
+      localStorage.setItem('turf_bookings', JSON.stringify(bookings));
+    }
+  }, [bookings]);
+
+  useEffect(() => {
+    if (!isFirebaseConfigured) {
+      localStorage.setItem('turf_blocked', JSON.stringify(blockedSlots));
+    }
+  }, [blockedSlots]);
 
   // 2. Path Routing
   const [currentPath, setCurrentPath] = useState(window.location.pathname || '/');
@@ -161,7 +218,7 @@ export default function App() {
     }
   };
 
-  const handleBookingSubmit = (e) => {
+  const handleBookingSubmit = async (e) => {
     e.preventDefault();
     if (duration <= 0) return setBookingError('Out time must be later than In time.');
 
@@ -178,8 +235,9 @@ export default function App() {
     if (isBookingOverlap) return setBookingError('This time slot overlaps with an existing booking. Please try another time.');
     if (isBlockedOverlap) return setBookingError('This time slot is blocked by Admin (Maintenance/Leave). Please choose another time.');
 
+    const bookingId = 'B' + String(bookings.length + 1).padStart(3, '0') + '-' + Math.floor(Math.random() * 1000);
     const newBooking = {
-      id: 'B' + String(bookings.length + 1).padStart(3, '0') + '-' + Math.floor(Math.random() * 1000),
+      id: bookingId,
       userName: clientProfile.name,
       teamName: bookingTeam,
       userPhone: bookingPhone,
@@ -193,24 +251,39 @@ export default function App() {
       createdAt: new Date().toISOString()
     };
 
-    setBookings([newBooking, ...bookings]);
-    setBookingSuccess(newBooking);
-    setBookingError('');
-    setBookingPhone('');
-    setBookingEmail('');
+    if (isFirebaseConfigured) {
+      try {
+        await setDoc(doc(db, 'bookings', bookingId), newBooking);
+        setBookingSuccess(newBooking);
+        setBookingError('');
+        setBookingPhone('');
+        setBookingEmail('');
+      } catch (error) {
+        console.error("Error adding booking to Firestore:", error);
+        setBookingError('Failed to save booking to Cloud. Please try again.');
+        return;
+      }
+    } else {
+      setBookings([newBooking, ...bookings]);
+      setBookingSuccess(newBooking);
+      setBookingError('');
+      setBookingPhone('');
+      setBookingEmail('');
+    }
 
     const text = `New Turf Booking Request! ⚽\n\n*Name:* ${newBooking.userName}\n*Team:* ${newBooking.teamName}\n*Date:* ${newBooking.bookingDate}\n*Time:* ${newBooking.inTimeStr} - ${newBooking.outTimeStr}\n*Phone:* ${newBooking.userPhone}\n\nPlease check admin portal.`;
     window.open(`https://wa.me/916379782142?text=${encodeURIComponent(text)}`, '_blank');
   };
 
-  const handleAdminBlockSlot = (e) => {
+  const handleAdminBlockSlot = async (e) => {
     e.preventDefault();
     const bIn24 = get24Hour(blockInTime);
     const bOut24 = get24Hour(blockOutTime);
     if (bOut24 <= bIn24) return alert('Out time must be later than In time');
 
+    const blockId = 'BLK-' + Math.floor(Math.random() * 10000);
     const newBlock = {
-      id: 'BLK-' + Math.floor(Math.random() * 10000),
+      id: blockId,
       date: blockDate,
       inTimeStr: formatTime(blockInTime),
       outTimeStr: formatTime(blockOutTime),
@@ -218,21 +291,58 @@ export default function App() {
       out24: bOut24,
       reason: blockReason
     };
-    setBlockedSlots([newBlock, ...blockedSlots]);
-    setBlockReason('Maintenance');
+
+    if (isFirebaseConfigured) {
+      try {
+        await setDoc(doc(db, 'blockedSlots', blockId), newBlock);
+        setBlockReason('Maintenance');
+      } catch (error) {
+        console.error("Error blocking slot in Firestore:", error);
+        alert('Failed to block slot in Cloud. Please try again.');
+      }
+    } else {
+      setBlockedSlots([newBlock, ...blockedSlots]);
+      setBlockReason('Maintenance');
+    }
   };
 
-  const handleUpdateBookingStatus = (id, newStatus) => {
-    setBookings(bookings.map(b => {
-      if (b.id === id) {
-        const statusText = newStatus === 'confirmed' ? 'APPROVED ✅' : 'REJECTED ❌';
-        let text = `Hello ${b.userName},\nYour turf booking for *${b.bookingDate}* at *${b.inTimeStr} - ${b.outTimeStr}* has been *${statusText}*.\n`;
-        if (newStatus === 'confirmed') text += `\nPlease visit the turf on time. Thank you!`;
-        window.open(`https://wa.me/${formatPhoneForWA(b.userPhone)}?text=${encodeURIComponent(text)}`, '_blank');
-        return { ...b, status: newStatus };
+  const handleRemoveBlockSlot = async (id) => {
+    if (isFirebaseConfigured) {
+      try {
+        await deleteDoc(doc(db, 'blockedSlots', id));
+      } catch (error) {
+        console.error("Error removing blocked slot from Firestore:", error);
+        alert('Failed to remove blocked slot. Please try again.');
       }
-      return b;
-    }));
+    } else {
+      setBlockedSlots(blockedSlots.filter(s => s.id !== id));
+    }
+  };
+
+  const handleUpdateBookingStatus = async (id, newStatus) => {
+    const booking = bookings.find(b => b.id === id);
+    if (!booking) return;
+
+    const statusText = newStatus === 'confirmed' ? 'APPROVED ✅' : 'REJECTED ❌';
+    let text = `Hello ${booking.userName},\nYour turf booking for *${booking.bookingDate}* at *${booking.inTimeStr} - ${booking.outTimeStr}* has been *${statusText}*.\n`;
+    if (newStatus === 'confirmed') text += `\nPlease visit the turf on time. Thank you!`;
+    window.open(`https://wa.me/${formatPhoneForWA(booking.userPhone)}?text=${encodeURIComponent(text)}`, '_blank');
+
+    if (isFirebaseConfigured) {
+      try {
+        await updateDoc(doc(db, 'bookings', id), { status: newStatus });
+      } catch (error) {
+        console.error("Error updating booking status in Firestore:", error);
+        alert('Failed to update booking status in Cloud. Please try again.');
+      }
+    } else {
+      setBookings(bookings.map(b => {
+        if (b.id === id) {
+          return { ...b, status: newStatus };
+        }
+        return b;
+      }));
+    }
   };
 
 
@@ -258,6 +368,7 @@ export default function App() {
               <h1 className="logo-text">TURF TIME</h1>
             </div>
             <nav className="nav-links">
+              <FirebaseStatusBadge />
               {isAdminLoggedIn ? (
                 <button onClick={() => { setIsAdminLoggedIn(false); setAdminUsername(''); setAdminPassword(''); }} className="btn-secondary" style={{padding: '8px 16px', fontSize: '13px'}}>
                   <LogOut size={14} style={{display: 'inline', marginRight: '6px'}}/> Logout
@@ -410,7 +521,7 @@ export default function App() {
                             <h4 style={{ color: 'var(--accent-red)' }}><AlertTriangle size={16} style={{display:'inline', verticalAlign:'text-bottom'}}/> {b.reason}</h4>
                             <p style={{marginTop: '6px', color: 'var(--text-bright)'}}>{b.date} | {b.inTimeStr} - {b.outTimeStr}</p>
                           </div>
-                          <button className="btn-secondary" onClick={() => setBlockedSlots(blockedSlots.filter(s => s.id !== b.id))}>Remove</button>
+                          <button className="btn-secondary" onClick={() => handleRemoveBlockSlot(b.id)}>Remove</button>
                         </div>
                       ))}
                     </div>
@@ -440,6 +551,7 @@ export default function App() {
             <h1 className="logo-text">TURF TIME</h1>
           </div>
           <nav className="nav-links">
+            <FirebaseStatusBadge />
             {clientProfile && (
               <button onClick={() => setShowProfileModal(true)} className="role-btn active" style={{marginRight: '12px'}}>
                 <History size={14} /> My History
