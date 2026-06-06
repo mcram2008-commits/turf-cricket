@@ -136,6 +136,7 @@ export default function App() {
   const [adminPassword, setAdminPassword] = useState('');
   const [loginError, setLoginError] = useState(false);
   const [adminTab, setAdminTab] = useState('bookings');
+  const [adminSearchPhone, setAdminSearchPhone] = useState('');
   
   const [blockDate, setBlockDate] = useState(new Date().toISOString().split('T')[0]);
   const [blockInTime, setBlockInTime] = useState({ hour: '10', minute: '00', ampm: 'AM' });
@@ -321,12 +322,24 @@ export default function App() {
                 )}
                 {adminTab === 'bookings' && (
                   <div>
-                    <h3 className="section-title">Manage Bookings (Live Sync)</h3>
-                    {bookings.length === 0 ? (
-                      <p>No bookings yet.</p>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
+                      <h3 className="section-title" style={{ margin: 0 }}>Manage Bookings</h3>
+                      <div style={{ position: 'relative', width: '100%', maxWidth: '300px' }}>
+                        <input 
+                          type="tel" 
+                          placeholder="Search Mobile Number..." 
+                          value={adminSearchPhone} 
+                          onChange={(e) => setAdminSearchPhone(e.target.value)} 
+                          style={{ padding: '10px 14px 10px 36px', borderRadius: '8px', border: '1px solid var(--border)', background: 'rgba(0,0,0,0.5)', color: 'white', fontSize: '14px', width: '100%' }}
+                        />
+                        <Phone size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: 'var(--text-muted)' }} />
+                      </div>
+                    </div>
+                    {bookings.filter(b => b.userPhone.includes(adminSearchPhone)).length === 0 ? (
+                      <p style={{ color: 'var(--text-muted)' }}>No bookings found.</p>
                     ) : (
                       <div className="bookings-list">
-                        {bookings.map(booking => (
+                        {bookings.filter(b => b.userPhone.includes(adminSearchPhone)).map(booking => (
                           <div className="booking-card glass-panel" key={booking.id}>
                             <div className="booking-card-info">
                               <div className="booking-sport-icon"><Users size={24} /></div>
