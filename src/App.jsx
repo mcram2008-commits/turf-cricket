@@ -393,7 +393,7 @@ export default function App() {
                 </div>
                 <form onSubmit={(e) => {
                   e.preventDefault();
-                  if (adminUsername === 'admin' && adminPassword === '1234') {
+                  if (adminUsername === 'turftn29' && adminPassword === 'turf') {
                     setIsAdminLoggedIn(true); setLoginError(false);
                   } else setLoginError(true);
                 }} style={{ marginTop: '24px' }}>
