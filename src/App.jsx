@@ -31,6 +31,10 @@ const get24Hour = (timeObj) => {
 };
 
 const formatTime = (timeObj) => `${timeObj.hour}:${timeObj.minute} ${timeObj.ampm}`;
+const formatPhoneForWA = (phone) => {
+  const digits = phone.replace(/\D/g, '');
+  return digits.length === 10 ? `91${digits}` : digits;
+};
 
 const CustomTimePicker = ({ label, time, setTime }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -195,8 +199,8 @@ export default function App() {
     setBookingPhone('');
     setBookingEmail('');
 
-    const text = `New Turf Booking Request Submitted! ⚽\n\nName: ${newBooking.userName}\nTeam: ${newBooking.teamName}\nDate: ${newBooking.bookingDate}\nTime: ${newBooking.inTimeStr} - ${newBooking.outTimeStr}\n\nPlease wait for admin approval.`;
-    alert(text);
+    const text = `New Turf Booking Request! ⚽\n\n*Name:* ${newBooking.userName}\n*Team:* ${newBooking.teamName}\n*Date:* ${newBooking.bookingDate}\n*Time:* ${newBooking.inTimeStr} - ${newBooking.outTimeStr}\n*Phone:* ${newBooking.userPhone}\n\nPlease check admin portal.`;
+    window.open(`https://wa.me/916379782142?text=${encodeURIComponent(text)}`, '_blank');
   };
 
   const handleAdminBlockSlot = (e) => {
@@ -221,6 +225,10 @@ export default function App() {
   const handleUpdateBookingStatus = (id, newStatus) => {
     setBookings(bookings.map(b => {
       if (b.id === id) {
+        const statusText = newStatus === 'confirmed' ? 'APPROVED ✅' : 'REJECTED ❌';
+        let text = `Hello ${b.userName},\nYour turf booking for *${b.bookingDate}* at *${b.inTimeStr} - ${b.outTimeStr}* has been *${statusText}*.\n`;
+        if (newStatus === 'confirmed') text += `\nPlease visit the turf on time. Thank you!`;
+        window.open(`https://wa.me/${formatPhoneForWA(b.userPhone)}?text=${encodeURIComponent(text)}`, '_blank');
         return { ...b, status: newStatus };
       }
       return b;
