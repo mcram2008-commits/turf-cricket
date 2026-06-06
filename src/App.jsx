@@ -455,11 +455,11 @@ export default function App() {
                         <Phone size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: 'var(--text-muted)' }} />
                       </div>
                     </div>
-                    {bookings.filter(b => b.userPhone.includes(adminSearchPhone)).length === 0 ? (
+                    {bookings.filter(b => (b.userPhone || '').includes(adminSearchPhone)).length === 0 ? (
                       <p style={{ color: 'var(--text-muted)' }}>No bookings found.</p>
                     ) : (
                       <div className="bookings-list">
-                        {bookings.filter(b => b.userPhone.includes(adminSearchPhone)).map(booking => (
+                        {bookings.filter(b => (b.userPhone || '').includes(adminSearchPhone)).map(booking => (
                           <div className="booking-card glass-panel" key={booking.id}>
                             <div className="booking-card-info">
                               <div className="booking-sport-icon"><Users size={24} /></div>
@@ -644,14 +644,14 @@ export default function App() {
                   </div>
                 </div>
                 
-                {bookings.filter(b => b.status !== 'rejected' && (b.teamName.toLowerCase().includes(clientSearchQuery.toLowerCase()) || b.userPhone.includes(clientSearchQuery))).length === 0 ? (
+                {bookings.filter(b => b.status !== 'rejected' && ((b.teamName || '').toLowerCase().includes(clientSearchQuery.toLowerCase()) || (b.userPhone || '').includes(clientSearchQuery))).length === 0 ? (
                    <div className="glass-panel" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
                      <Activity size={32} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
                      <p>No matches found.</p>
                    </div>
                 ) : (
                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
-                     {bookings.filter(b => b.status !== 'rejected' && (b.teamName.toLowerCase().includes(clientSearchQuery.toLowerCase()) || b.userPhone.includes(clientSearchQuery))).map(b => (
+                     {bookings.filter(b => b.status !== 'rejected' && ((b.teamName || '').toLowerCase().includes(clientSearchQuery.toLowerCase()) || (b.userPhone || '').includes(clientSearchQuery))).map(b => (
                         <div key={b.id} className="glass-panel" style={{ padding: '16px', borderLeft: '4px solid ' + (b.status === 'confirmed' ? 'var(--accent-green)' : 'var(--accent-yellow)'), display: 'flex', flexDirection: 'column', gap: '10px' }}>
                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                              <h4 style={{ fontSize: '18px', color: 'var(--text-bright)', margin: 0 }}>{b.teamName}</h4>
