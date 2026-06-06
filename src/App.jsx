@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   Calendar, Clock, User, LogOut, Trophy, Activity, DollarSign,
-  Check, Lock, MapPin, Phone, ArrowRight, Users, Eye,
+  Check, Lock, MapPin, Phone, ArrowRight, Users, Eye, Search,
   CreditCard, Car, Bath, Shirt, X, History, ShieldAlert, AlertTriangle, FileText, Download, Package
 } from 'lucide-react';
 import './App.css';
@@ -110,6 +110,7 @@ export default function App() {
   const [entryName, setEntryName] = useState('');
   const [entryTeam, setEntryTeam] = useState('');
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [clientSearchQuery, setClientSearchQuery] = useState('');
   
   const [bookingDate, setBookingDate] = useState(new Date().toISOString().split('T')[0]);
   const [inTime, setInTime] = useState({ hour: '10', minute: '00', ampm: 'AM' });
@@ -506,18 +507,31 @@ export default function App() {
               </div>
 
               <div className="recent-bookings-section animate-slide" style={{ marginTop: '30px', animationDelay: '0.2s' }}>
-                <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', borderBottom: '1px solid var(--border)', paddingBottom: '12px' }}>
-                  <Calendar size={22} color="var(--primary)" /> 
-                  Upcoming & Recent Matches
-                </h3>
-                {bookings.filter(b => b.status !== 'rejected').length === 0 ? (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--border)', paddingBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
+                  <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, borderBottom: 'none', paddingBottom: 0 }}>
+                    <Calendar size={22} color="var(--primary)" /> 
+                    Upcoming Matches
+                  </h3>
+                  <div style={{ position: 'relative', width: '100%', maxWidth: '250px' }}>
+                    <input 
+                      type="text" 
+                      placeholder="Search Team or Mobile..." 
+                      value={clientSearchQuery} 
+                      onChange={(e) => setClientSearchQuery(e.target.value)} 
+                      style={{ padding: '8px 12px 8px 32px', borderRadius: '8px', border: '1px solid var(--border)', background: 'rgba(0,0,0,0.5)', color: 'white', fontSize: '13px', width: '100%' }}
+                    />
+                    <Search size={14} style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--text-muted)' }} />
+                  </div>
+                </div>
+                
+                {bookings.filter(b => b.status !== 'rejected' && (b.teamName.toLowerCase().includes(clientSearchQuery.toLowerCase()) || b.userPhone.includes(clientSearchQuery))).length === 0 ? (
                    <div className="glass-panel" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
                      <Activity size={32} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
-                     <p>No matches scheduled yet.</p>
+                     <p>No matches found.</p>
                    </div>
                 ) : (
                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
-                     {bookings.filter(b => b.status !== 'rejected').map(b => (
+                     {bookings.filter(b => b.status !== 'rejected' && (b.teamName.toLowerCase().includes(clientSearchQuery.toLowerCase()) || b.userPhone.includes(clientSearchQuery))).map(b => (
                         <div key={b.id} className="glass-panel" style={{ padding: '16px', borderLeft: '4px solid ' + (b.status === 'confirmed' ? 'var(--accent-green)' : 'var(--accent-yellow)'), display: 'flex', flexDirection: 'column', gap: '10px' }}>
                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                              <h4 style={{ fontSize: '18px', color: 'var(--text-bright)', margin: 0 }}>{b.teamName}</h4>
